@@ -1,36 +1,45 @@
-import cv2
+import aiohttp
 
-# Basic video processing function
-def process_live_video(output_path):
-    # Open the default camera
-    cap = cv2.VideoCapture(0)
+async def book_appointment(appointment_data):
+    """
+    Make API call to create a new patient with minimal data
     
-    # Get the width and height of the frames
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    Args:
+        appointment_data (dict): Dictionary containing patient details (first_name, last_name, date_of_birth)
+        
+    Returns:
+        dict: API response with status and any error information
+    """
+    url = "https://ep.soaper.ai/api/v1/agent/patients/create"  # Update with your actual FastAPI server URL
+    headers = {
+        "Content-Type": "application/json",
+        "X-Agent-API-Key": "sk-int-agent-PJNvT3BlbkFJe8ykcJe6kV1KQntXzgMW"  # Replace with actual API key
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=appointment_data, headers=headers) as response:
+                response_data = await response.json()
+                
+                if response_data.get("success", False):
+                    return {
+                        "status": "success",
+                        "message": "Patient created successfully",
+                        "patient": response_data.get("patient")
+                    }
+                else:
+                    return {
+                        "status": "error",
+                        "message": response_data.get("message", "Error creating patient")
+                    }
     
-    # Define the codec and create VideoWriter object
-    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'XVID'), 20.0, (frame_width, frame_height))
-    
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        
-        # Process the frame (example: convert to grayscale)
-        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
-        # Write the processed frame to the output file
-        out.write(cv2.cvtColor(gray_frame, cv2.COLOR_GRAY2BGR))
-        
-        # Display the live video
-        cv2.imshow('Live Video', gray_frame)
-        
-        # Exit on pressing 'q'
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-    
-    # Release everything if job is finished
-    cap.release()
-    out.release()
-    cv2.destroyAllWindows()
+    except Exception as e:
+        print(f"Error calling patient creation API: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"There was a problem connecting to the patient creation service: {str(e)}"
+        }
+if __name__ == "__main__":
+    import asyncio
+    response = asyncio.run(book_appointment({"first_name": "John", "last_name": "Doe", "date_of_birth": "1990-01-01"}))
+    print(response)
