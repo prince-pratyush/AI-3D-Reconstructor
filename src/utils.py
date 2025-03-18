@@ -43,7 +43,8 @@ async def get_patient_id(appointment_data):
     
 async def book_appointment(appointment_data):
     """
-    Make API call to book an appointment
+    Make API call to book an appointment. From first name and last name, get physician_id using get_physician_by_name.
+    and use the physician_id to get the visit types using get_physician_visit_type.
     
     Args:
         appointment_data (dict): Dictionary containing appointment details including:
@@ -102,7 +103,7 @@ async def book_appointment(appointment_data):
             "message": f"There was a problem connecting to the appointment scheduling service: {str(e)}"
         }
     
-async def get_physician_by_name(physician_first_name, physician_last_name):
+async def get_physician_id_by_name(physician_first_name, physician_last_name):
     """
     Make API call to get a physician by first name and last name
     """
@@ -116,19 +117,20 @@ async def get_physician_by_name(physician_first_name, physician_last_name):
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers) as response:
                 response_data = await response.json()
-                for physician in response_data.get("items", []):
-                    if (physician.get("first_name") == physician_first_name and 
-                        physician.get("last_name") == physician_last_name):
-                        return {
-                            "status": "success",
-                            "physician_id": physician.get("id"),
-                            "physician_name": f"{physician.get('first_name')} {physician.get('last_name')}"
-                        }
+                # for physician in response_data.get("items", []):
+                #     if (physician.get("first_name") == physician_first_name and 
+                #         physician.get("last_name") == physician_last_name):
+                #         return {
+                #             "status": "success",
+                #             "physician_id": physician.get("id"),
+                #             "physician_name": f"{physician.get('first_name')} {physician.get('last_name')}"
+                #         }
+                print(response_data)
                 
-                return {
-                    "status": "error",
-                    "message": "Physician not found"
-                }
+                # return {
+                #     "status": "error",
+                #     "message": "Physician not found"
+                # }
     except Exception as e:
         print(f"Error calling physician API: {str(e)}")
         return {
@@ -158,7 +160,7 @@ async def get_physician_visit_type(physician_first_name, physician_last_name, pa
         async with aiohttp.ClientSession() as session:
             async with session.get(physician_url, headers=headers) as response:
                 response_data = await response.json()
-                all_physicians = response_data.get("items", [])
+                all_physicians = response_data.get("slots", [])
     except Exception as e:
         print(f"Error calling physician API: {str(e)}")
         
@@ -210,22 +212,66 @@ async def get_physician_visit_type(physician_first_name, physician_last_name, pa
             "status": "error",
             "message": f"There was a problem connecting to the physician visit types service: {str(e)}"
         }
+    
+async def get_doctor_time_slots(appointment_data):
+    """
+    Make API call to get next available appointment slots for an agent
+    """
+    url = f"https://ep.soaper.ai/api/v1/agent/appointments/next-available"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Agent-API-Key": "sk-int-agent-PJNvT3BlbkFJe8ykcJe6kV1KQntXzgMW"
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=appointment_data, headers=headers) as response:
+                response_data = await response.json()
+                if response_data.get("success", False):
+                    return {
+                        "success": True,
+                        "slots": response_data.get("slots", []),
+                        "message": response_data.get("message", "Doctor time slots retrieved successfully")
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "slots": [],
+                        "message": response_data.get("message", "No available appointments found")
+                    }
+    except Exception as e:
+        print(f"Error calling next available slots API: {str(e)}")
+        return {
+            "success": False,
+            "slots": [],
+            "message": f"There was a problem connecting to the next available slots service: {str(e)}"
+        }
 
 if __name__ == "__main__":
     import asyncio
-    response = asyncio.run(get_patient_id({"first_name": "John", "last_name": "Doe", "date_of_birth": "1990-01-01"}))
-    print(response)
+    # response = asyncio.run(get_patient_id({"first_name": "John", "last_name": "Doe", "date_of_birth": "1990-01-01"}))
+    # print(response)
 
-    response = asyncio.run(book_appointment({
-        "patient_id": "0e2a370e-5b01-404c-8a74-3e6e6d3949a2",
-        "physician_id": "81877c7b-d22a-49f4-a2e1-598a12e2bf7c",
-        "datetime": "2025-03-19T15:00:00",
-        "visit_type": "New Patient Consultation",
-        "duration_minutes": 30,
-        "visit_notes": "Follow-up visit",
-        "location_id": "123e4567-e89b-12d3-a456-426614174000"
-    }))
-    print(response)
+    # response = asyncio.run(book_appointment({
+    #     "patient_id": "0e2a370e-5b01-404c-8a74-3e6e6d3949a2",
+    #     "physician_first_name": "Nicholas",
+    #     "physician_last_name": "Romero",
+    #     "datetime": "2025-03-19T15:00:00",
+    #     "visit_type": "New Patient Consultation",
+    #     "duration_minutes": 30,
+    #     "visit_notes": "Follow-up visit",
+    #     "location_id": "123e4567-e89b-12d3-a456-426614174000"
+    # }))
+    # print(response)
 
     # response = asyncio.run(get_physician_visit_type("81877c7b-d22a-49f4-a2e1-598a12e2bf7c", "0e2a370e-5b01-404c-8a74-3e6e6d3949a2"))
     # print(response)
+
+    # response = asyncio.run(get_physician_id_by_name("Nicholas", "Romero"))
+    # print(response)
+
+    response = asyncio.run(get_doctor_time_slots({
+        "patient_id": "0e2a370e-5b01-404c-8a74-3e6e6d3949a2",
+        "physician_id": "81877c7b-d22a-49f4-a2e1-598a12e2bf7c",
+    }))
+    print(response)
